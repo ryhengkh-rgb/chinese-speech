@@ -20,8 +20,12 @@ export async function POST(req: Request) {
     }
 
     // Initialize TTS Client
-    // It will automatically use GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_API_KEY from environment
-    const client = new textToSpeech.TextToSpeechClient();
+    // It will use GOOGLE_API_KEY if available, otherwise it falls back to GOOGLE_APPLICATION_CREDENTIALS
+    const clientOptions: any = {};
+    if (process.env.GOOGLE_API_KEY) {
+      clientOptions.apiKey = process.env.GOOGLE_API_KEY;
+    }
+    const client = new textToSpeech.TextToSpeechClient(clientOptions);
 
     const chunks = chunkChineseText(text);
     const tempDir = os.tmpdir();
