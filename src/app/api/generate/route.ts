@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import textToSpeech from '@google-cloud/text-to-speech';
-import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { chunkChineseText } from '@/utils/text-chunker';
+import { EdgeTTS } from 'node-edge-tts';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
@@ -19,63 +19,49 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
     }
 
-    // Initialize TTS Client
-    // It will use GOOGLE_API_KEY if available, otherwise it falls back to GOOGLE_APPLICATION_CREDENTIALS
-    const clientOptions: any = {};
-    if (process.env.GOOGLE_API_KEY) {
-      clientOptions.apiKey = process.env.GOOGLE_API_KEY;
-    }
-    const client = new textToSpeech.TextToSpeechClient(clientOptions);
-
     const chunks = chunkChineseText(text);
     const tempDir = os.tmpdir();
     const runId = uuidv4();
     const chunkFiles: string[] = [];
 
-    // Process each chunk
+    // Map speed to Edge TTS rate format (+10%, -10%, etc)
+    const speedPercent = Math.round((speed - 1.0) * 100);
+    let rateStr = speedPercent >= 0 ? `+${speedPercent}%` : `${speedPercent}%`;
+
+    // Adjust rate for "Conversational Warm"
+    if (style === 'Conversational Warm') {
+      const warmSpeed = Math.max(speedPercent, 10); // slightly faster
+      rateStr = warmSpeed >= 0 ? `+${warmSpeed}%` : `${warmSpeed}%`;
+    }
+
+    // Map pitch
+    let pitchStr = '+0Hz';
+    if (pitch === 'Lower') pitchStr = '-10Hz';
+    if (pitch === 'Higher') pitchStr = '+10Hz';
+
     for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      let ssml = `<speak>`;
+      let chunkText = chunks[i];
       
-      // Approximate style with SSML if conversational warm
-      let rate = speed || 1.0;
-      let pitchVal = pitch === 'Lower' ? '-2st' : pitch === 'Higher' ? '+2st' : '0st';
-      
-      if (style === 'Conversational Warm') {
-        // slightly overlapping pacing -> slightly faster rate, maybe 1.1x or tight breaks
-        rate = Math.max(rate, 1.1); 
-      }
-      
-      ssml += `<prosody rate="${rate}" pitch="${pitchVal}">`;
-      
-      // Insert pauses based on setting
-      let chunkText = chunk;
+      // Simulate pause handling with commas/periods since Edge TTS respects them naturally
       if (pause === 'Tight') {
-        chunkText = chunkText.replace(/([。？！])/g, '$1<break time="200ms"/>');
+        chunkText = chunkText.replace(/([。？！])/g, ','); 
       } else if (pause === 'Relaxed') {
-        chunkText = chunkText.replace(/([。？！])/g, '$1<break time="800ms"/>');
-      } else {
-        // Natural (Default)
-        chunkText = chunkText.replace(/([。？！])/g, '$1<break time="400ms"/>');
+        chunkText = chunkText.replace(/([。？！])/g, '$1... ');
       }
-      
-      ssml += chunkText;
-      ssml += `</prosody></speak>`;
 
-      const request = {
-        input: { ssml: ssml },
-        voice: {
-          languageCode: region === 'Taiwan Mandarin' ? 'zh-TW' : 'zh-CN',
-          name: voice || (region === 'Taiwan Mandarin' ? 'zh-TW-Wavenet-A' : 'zh-CN-Journey-F')
-        },
-        audioConfig: { audioEncoding: 'MP3' as const },
-      };
-
-      const [response] = await client.synthesizeSpeech(request);
-      
       const chunkFile = path.join(tempDir, `chunk_${runId}_${i}.mp3`);
-      if (response.audioContent) {
-        fs.writeFileSync(chunkFile, response.audioContent, 'binary');
+      
+      const tts = new EdgeTTS({
+        voice: voice || 'zh-CN-XiaoxiaoNeural',
+        lang: region === 'Taiwan Mandarin' ? 'zh-TW' : 'zh-CN',
+        outputFormat: 'audio-24khz-48kbitrate-mono-mp3',
+        rate: rateStr,
+        pitch: pitchStr
+      });
+
+      await tts.ttsPromise(chunkText, chunkFile);
+      
+      if (fs.existsSync(chunkFile)) {
         chunkFiles.push(chunkFile);
       }
     }
@@ -85,7 +71,6 @@ export async function POST(req: Request) {
     }
 
     if (chunkFiles.length === 1) {
-      // Just return the single file
       const audioBuffer = fs.readFileSync(chunkFiles[0]);
       fs.unlinkSync(chunkFiles[0]);
       

@@ -5,15 +5,15 @@ import { Play, Pause, Download, Loader2, Volume2 } from 'lucide-react';
 
 const VOICES = {
   'Mainland Mandarin': [
-    { name: 'zh-CN-Journey-F', label: 'Mandarin Female 1 (Expressive)' },
-    { name: 'zh-CN-Journey-O', label: 'Mandarin Female 2 (Expressive)' },
-    { name: 'zh-CN-Journey-D', label: 'Mandarin Male 1 (Expressive)' },
-    { name: 'zh-CN-Wavenet-B', label: 'Mandarin Male 2 (Standard)' }
+    { name: 'zh-CN-XiaoxiaoNeural', label: 'Mandarin Female 1 (Warm)' },
+    { name: 'zh-CN-YunxiNeural', label: 'Mandarin Male 1 (Energetic)' },
+    { name: 'zh-CN-YunjianNeural', label: 'Mandarin Male 2 (Professional)' },
+    { name: 'zh-CN-XiaoyiNeural', label: 'Mandarin Female 2 (Youthful)' }
   ],
   'Taiwan Mandarin': [
-    { name: 'zh-TW-Wavenet-A', label: 'Taiwan Female 1' },
-    { name: 'zh-TW-Wavenet-B', label: 'Taiwan Male 1' },
-    { name: 'zh-TW-Wavenet-C', label: 'Taiwan Male 2' }
+    { name: 'zh-TW-HsiaoChenNeural', label: 'Taiwan Female 1' },
+    { name: 'zh-TW-HsiaoYuNeural', label: 'Taiwan Female 2' },
+    { name: 'zh-TW-YunJheNeural', label: 'Taiwan Male 1' }
   ]
 };
 
